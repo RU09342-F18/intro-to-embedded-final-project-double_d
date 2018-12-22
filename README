@@ -1,1 +1,58 @@
+***************************************************************************************************************************************
+OVERVIEW
+--------
 
+This program uses the MSP430F5529 to simulate a highway street light that only turns on at night when cars are coming.
+An accelerometer uses the road vibrations to sense sense when a car is coming and how fast it is going.
+A photoresistor senses whether it is daytime or nighttime. During the day, the system will shut off.
+The program is based on a model where the street light is 200 meters down the road from the sensor module.
+The sensor module will delay turning on the street light so it turns on 5 seconds before the car reaches the light.
+
+***************************************************************************************************************************************
+SPECIFICATIONS
+--------------
+
+ Assumptions:
+ 1. The frequency of the road vibration is proportional to the speed of the vehicle: velocity = k * frequency
+ 2. Cars are moving at a constant velocity
+ 3. Expected frequency range on the road is 10-100 Hz
+
+***************************************************************************************************************************************
+MSP430F5529 DESIGN
+------------------
+
+Global Variables:
+ ______________________________________________________________________________________________________________
+|NAME          | DATA TYPE    | DESCRIPTION                                                                    |
+|--------------|--------------|--------------------------------------------------------------------------------|
+| q            | unsigned int | used in ADC12ISR to store the value of ADC12MEM0 (light info)                  |
+| q2           | unsigned int | used in ADC12ISR to store the value of ADC12MEM1 (envelope info)               |
+| timerState   | int          | used in Port_2 interrupt to track the state when measuring frequency           |
+| period       | double       | used in Port_2 interrupt to store the value of TA0CCR0                         |
+| k            | const double | constant relating car velocity to vibration frequency. We chose k = 0.5        |
+| delay        | short        | used in periodToDelayConversion and represents delay time [s] to turn on light |
+| isCarPresent | _Bool        | tracks when a car is present. 1 when car is present, and 0 otherwise           |
+| isDark       | _Bool        | when it is dark. 1 when it is dark, and 0 otherwise                            |
+| turnOnLight  | const _Bool  | sends over UART to another board to dictate when to turn on and off Lights     |
+|______________|______________|________________________________________________________________________________|
+
+Functions:
+ _________________________________________________________________________________________________________________
+| TYPE      | DECLARATION                            | DESCRIPTION                                                |
+|-----------|----------------------------------------|------------------------------------------------------------|
+| Setup     | void ADC12setup()                      | configures the ADC12 peripheral                            |
+| Setup     | void UARTsetup()                       | configures UART to interface with Realterm                 |
+| Setup     | void portSetup()                       | configures the ports to read the photoresistor             |
+| Setup     | void zeroCrossingSetup()               | configures Port and timer for zero-cross detection         |
+|           |                                        |                                                            |
+| Internal  | void periodToDelayConversion(double x) | converts period of the input signal to light turn-on delay |
+| Internal  | void initiateTimerDelay(short del)     | converts the delay in seconds to CCR0 value                |
+|           |                                        |                                                            |
+| Interrupt | __interrupt void ADC12ISR()            | Interrupts to sample the light, and the vibration envelope |
+| Interrupt | __interrupt void USCI_A1_interrupt()   | USB-to-pin UART communication protocol                     |
+| Interrupt | __interrupt void USCI_A0_interrupt()   | pin-to-pin UART communication protocol                     |
+| Interrupt | __interrupt void Port_2(void)          | Interrupts every posedge of zero-cross detection           |
+| Interrupt | __interrupt void TIMER0_A0(void)       | Interrupts when to turn on the street light                |
+|___________|________________________________________|____________________________________________________________|
+
+***************************************************************************************************************************************
